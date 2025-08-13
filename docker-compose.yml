@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    env_file: .env
+    depends_on:
+      - redis
+      - database
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+    restart: unless-stopped
+
+  immich-web:
+    image: ghcr.io/immich-app/immich-web:release
+    env_file: .env
+    depends_on:
+      - immich-server
+    # Coolify will put this behind Traefik; exposing 3000 is enough
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    env_file: .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"] # remove if no GPU
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis:/data
+    restart: unless-stopped
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: immich
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis:
